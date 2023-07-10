@@ -1,6 +1,6 @@
 /**
  * @file main.cpp
- * @author your name (you@domain.com)
+ * @author elijah
  * @brief 
  * This is the code script for controlling two GMR sensor equipped motors with pid closed loop.
  * The target rpm can be controlled by a variable resistor.
