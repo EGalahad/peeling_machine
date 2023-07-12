@@ -114,6 +114,7 @@
  * 1. STATE: CLOSE.
  * @param close_upper: initialized to true. when the upper clamping blade
  * touches the fruit, it is set to false.
+ * 
  * 2. STATE: UP.
  * @param height_remaining_upper: initialized to the height that the upper
  * clamping blade should move up.
@@ -123,14 +124,6 @@
  * blade should move up.
  *
  * 3. STATE: PEEL.
- * @param height_remaining_peel: initialized to the height that the peeling
- * blade should move down.
- *
- * 4. STATE: DOWN.
- * @param height_remaining_upper: initialized to the height that the upper
- * clamping blade should move down.
- * @param height_remaining_lower: initialized to the height that the lower
- * clamping blade should move down.
  * @param height_remaining_peel: initialized to the height that the peeling
  * blade should move down.
  *
@@ -149,47 +142,9 @@
 
 #include "constants.hpp"
 #include "globals.hpp"
+#include "pins.hpp"
 
 auto state_machine = StateMachine(State::STOPPED);
-
-/********************* PIN DEFINITION ***********************
-************************************************************/
-// button pins
-const int pin_start_stop_button = 2;
-const int pin_self_cleaning_button = 3;
-
-// clamping blades motor pins
-const int pin_ena_upper = 5;
-const int pin_in1_upper = 6;
-const int pin_in2_upper = 7;
-const int pin_in3_lower = 8;
-const int pin_in4_lower = 9;
-const int pin_enb_lower = 10;
-
-// rotating motor pins
-const int pin_ena_rotate = 11;
-const int pin_in1_rotate = 12;
-const int pin_in2_rotate = 13;
-// peeling blade motor pins
-const int pin_in3_peel = 4;
-const int pin_in4_peel = 5;
-const int pin_enb_peel = 6;
-
-// encoder signal pins
-const int pin_encoder_upper = 2;
-const int pin_encoder_lower = 2;
-const int pin_encoder_peel = 2;
-
-// pressure sensors attached to the end at the range of motion of screw rods
-const int pin_screw_rod_upper = A0;
-const int pin_screw_rod_lower = A1;
-const int pin_screw_rod_peel = A2;
-
-// pressure sensor attached to upper clamping blade
-const int pin_upper_pressure_sensor = A2;
-
-// // water pump pins
-// const int pin_water_pump_1 = 13;
 
 MotorControl motor_upper{pin_in2_upper, pin_ena_upper, pin_in1_upper};
 MotorControl motor_lower{pin_in3_lower, pin_enb_lower, pin_in4_lower};
@@ -200,11 +155,6 @@ MotorControl motor_peel{pin_in3_peel, pin_enb_peel, pin_in4_peel};
 volatile unsigned int counter_upper = 0;
 volatile unsigned int counter_lower = 0;
 volatile unsigned int counter_peel = 0;
-
-int pwm_upper = 0;
-int pwm_lower = 0;
-int pwm_peel = 0;
-int pwm_rotate = 0;
 
 int pressure = 0;
 
@@ -217,6 +167,8 @@ bool close_upper = true;
 float height_remaining_upper = 0;
 float height_remaining_lower = 0;
 float height_remaining_peel = 0;
+
+float peel_height = 0;
 
 /********************* FUNCTIONS *********************
  ***********************************************************/
@@ -344,15 +296,15 @@ void motor_control_loop() {
     case State::PEEL:
         peel();
         break;
-    
+
     case State::DOWN:
         down();
         break;
-    
+
     case State::OPEN:
         open();
         break;
-    
+
     default:
         break;
     }
@@ -411,6 +363,7 @@ void up() {
 
     if (height_remaining_upper < 0 && height_remaining_lower < 0 &&
         height_remaining_peel < 0) {
+        /// TODO: should set @param peel_height before calling state_machine.next()
         state_machine.next();
     }
     float rpm_cur_upper = (float)counter_upper / cpr / grr /
@@ -501,7 +454,7 @@ void open() {
     float rpm_cur_lower = counter_lower / cpr / grr /
                           ((float)control_interval_motors / 1000) * 60;
     float rpm_cur_peel = (float)counter_peel / cpr / grr /
-                            ((float)control_interval_motors / 1000) * 60;
+                         ((float)control_interval_motors / 1000) * 60;
 
     counter_upper = 0;
     counter_lower = 0;
@@ -510,5 +463,4 @@ void open() {
     motor_upper.set_rpm(rpm_cur_upper, rpm_target_open);
     motor_lower.set_rpm(rpm_cur_lower, rpm_target_open);
     motor_peel.set_rpm(rpm_cur_peel, rpm_target_open);
-
 }
