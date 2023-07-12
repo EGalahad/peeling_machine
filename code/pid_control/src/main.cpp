@@ -21,12 +21,12 @@
  * by the target_rpm, and the enb output drives the upper motor, the speed of
  * the upper motor is controlled using PID
  */
-const int pin_ena = 5;
-const int pin_in1 = 6;
-const int pin_in2 = 7;
-const int pin_in3 = 8;
-const int pin_in4 = 9;
-const int pin_enb = 10;
+const int pin_ena_upper = 5;
+const int pin_in1_upper = 6;
+const int pin_in2_upper = 7;
+const int pin_in3_lower = 8;
+const int pin_in4_lower = 9;
+const int pin_enb_lower = 10;
 
 // variable resistor to control the target rpm
 const int pin_rpm_target = A5;
@@ -67,7 +67,7 @@ int pwm_cur2 = 0;
 int pressure = 0;
 const int pressure_target = 900;
 // the threshold for pressure to consider the two motors are in contact
-const int pressure_threshold = 980;
+const int pressure_touch = 980;
 // the threshold for pressure for emergency stop
 const int pressure_threshold_lower = 850;
 
@@ -83,22 +83,22 @@ void set_direction(int pin_in1, int pin_in2, Direction dir);
 
 void setup() {
     Serial.begin(115200);
-    pinMode(pin_ena, OUTPUT);
-    pinMode(pin_in1, OUTPUT);
-    pinMode(pin_in2, OUTPUT);
-    pinMode(pin_in3, OUTPUT);
-    pinMode(pin_in4, OUTPUT);
-    pinMode(pin_enb, OUTPUT);
+    pinMode(pin_ena_upper, OUTPUT);
+    pinMode(pin_in1_upper, OUTPUT);
+    pinMode(pin_in2_upper, OUTPUT);
+    pinMode(pin_in3_lower, OUTPUT);
+    pinMode(pin_in4_lower, OUTPUT);
+    pinMode(pin_enb_lower, OUTPUT);
 
     pinMode(pin_rpm_target, INPUT);
     pinMode(pin_pressure, INPUT);
 
     // set initial direction
-    set_direction(pin_in1, pin_in2, Direction::STOP);
-    set_direction(pin_in3, pin_in4, Direction::STOP);
+    set_direction(pin_in1_upper, pin_in2_upper, Direction::STOP);
+    set_direction(pin_in3_lower, pin_in4_lower, Direction::STOP);
 
-    analogWrite(pin_ena, pwm_cur1);
-    analogWrite(pin_enb, pwm_cur2);
+    analogWrite(pin_ena_upper, pwm_cur1);
+    analogWrite(pin_enb_lower, pwm_cur2);
 
     FlexiTimer2::set(control_interval_millis, control);
     FlexiTimer2::start();
@@ -112,23 +112,23 @@ void control() {
     pressure = analogRead(pin_pressure);
 
     if (pressure < pressure_threshold_lower) {
-        set_direction(pin_in1, pin_in2, Direction::STOP);
-        analogWrite(pin_ena, 0);
+        set_direction(pin_in1_upper, pin_in2_upper, Direction::STOP);
+        analogWrite(pin_ena_upper, 0);
 
-        set_direction(pin_in3, pin_in4, Direction::STOP);
-        analogWrite(pin_enb, 0);
+        set_direction(pin_in3_lower, pin_in4_lower, Direction::STOP);
+        analogWrite(pin_enb_lower, 0);
 
         Serial.println("pressure is lower than threshold, stopping");
         return;
     }
 
-    if (pressure > pressure_threshold) {
+    if (pressure > pressure_touch) {
         // if the two are not touching, move motor 2 downwards
-        set_direction(pin_in1, pin_in2, Direction::UP);
-        analogWrite(pin_ena, pwm_write_max / 2);
+        set_direction(pin_in1_upper, pin_in2_upper, Direction::UP);
+        analogWrite(pin_ena_upper, pwm_write_max / 2);
 
-        set_direction(pin_in3, pin_in4, Direction::DOWN);
-        analogWrite(pin_enb, pwm_write_max / 3);
+        set_direction(pin_in3_lower, pin_in4_lower, Direction::DOWN);
+        analogWrite(pin_enb_lower, pwm_write_max / 3);
 
         Serial.print("pressure ");
         Serial.print(pressure);
@@ -141,9 +141,9 @@ void control() {
     Serial.print("rpm_target: ");
     Serial.print(rpm_target);
 
-    set_direction(pin_in1, pin_in2,
+    set_direction(pin_in1_upper, pin_in2_upper,
                   (rpm_target > 0) ? Direction::UP : Direction::DOWN);
-    set_direction(pin_in3, pin_in4,
+    set_direction(pin_in3_lower, pin_in4_lower,
                   (rpm_target > 0) ? Direction::UP : Direction::DOWN);
 
     // control the pwm of the raw motor to match the target rpm
@@ -172,8 +172,8 @@ void control() {
     pwm_cur2 = constrain(pwm_cur2, 0, pwm_write_max);
     // pwm_cur2 = constrain(pwm_cur2, 0, pwm_write_max2);
 
-    analogWrite(pin_ena, pwm_cur1);
-    analogWrite(pin_enb, pwm_cur2);
+    analogWrite(pin_ena_upper, pwm_cur1);
+    analogWrite(pin_enb_lower, pwm_cur2);
 }
 
 int pid(int pressure, int pressure_target) {
