@@ -102,6 +102,8 @@ void StateMachine::self_clean() {
 void StateMachine::pressure_err() {
     motor_upper.set_direction(Direction::STOP);
     motor_lower.set_direction(Direction::STOP);
+    motor_peel.set_direction(Direction::STOP);
+    motor_rotate_lower.set_direction(Direction::STOP);
     state = State::ERROR;
 }
 
@@ -123,8 +125,8 @@ void up_init_state() {
 
     // init motor state
     motor_upper.set_direction(Direction::UP);
-    motor_lower.set_direction(Direction::UP);
     motor_peel.set_direction(Direction::UP);
+    motor_lower.set_direction(Direction::UP);
 }
 
 void peel_init_state() {
@@ -132,16 +134,14 @@ void peel_init_state() {
     height_remaining_peel = peel_height;
 
     // init motor state
-    motor_upper.set_direction(Direction::STOP);
-    motor_lower.set_direction(Direction::STOP);
     motor_peel.set_direction(Direction::DOWN);
+    motor_rotate_lower.set_direction(Direction::UP);
 }
 
 void down_init_state() {
     // init motor state
     motor_upper.set_direction(Direction::DOWN);
     motor_lower.set_direction(Direction::DOWN);
-    // motor_peel.set_direction(Direction::DOWN);
 }
 
 void open_init_state() {
@@ -152,8 +152,8 @@ void open_init_state() {
 
     // init motor state
     motor_upper.set_direction(Direction::UP);
-    motor_lower.set_direction(Direction::DOWN);
     motor_peel.set_direction(Direction::UP);
+    motor_lower.set_direction(Direction::DOWN);
 }
 
 

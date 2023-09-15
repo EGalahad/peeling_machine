@@ -16,9 +16,9 @@ const int pin_in4_lower = 9;
 const int pin_enb_lower = 10;
 
 // rotating motor pins
-const int pin_ena_rotate = 11;
-const int pin_in1_rotate = 12;
-const int pin_in2_rotate = 13;
+const int pin_ena_rotate_lower = 11;
+const int pin_in1_rotate_lower = 12;
+const int pin_in2_rotate_lower = 13;
 // peeling blade motor pins
 const int pin_in3_peel = 4;
 const int pin_in4_peel = 5;
@@ -30,12 +30,12 @@ const int pin_encoder_lower = 2;
 const int pin_encoder_peel = 2;
 
 // pressure sensors attached to the end at the range of motion of screw rods
-const int pin_screw_rod_upper = A0;
-const int pin_screw_rod_lower = A1;
-const int pin_screw_rod_peel = A2;
+const int pin_pressure_screw_rod_upper = A0;
+const int pin_pressure_screw_rod_lower = A1;
+const int pin_pressure_screw_rod_peel = A2;
 
 // pressure sensor attached to upper clamping blade
-const int pin_upper_pressure_sensor = A2;
+const int pin_pressure_clamp_upper = A2;
 
 // // water pump pins
 // const int pin_water_pump_1 = 13;

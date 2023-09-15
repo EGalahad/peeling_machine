@@ -1,6 +1,13 @@
+/**
+ * @file globals.hpp
+ * @author elijah
+ * @brief Global variables shared between main.cpp and state_control.cpp
+ *
+ * @copyright Copyright (c) 2023
+ *
+ */
 #pragma once
 
-class MotorControl;
 
 /***
  * states variables, initialized in state machine during state transitions
@@ -18,11 +25,12 @@ extern float peel_height;
 // extern bool open_lower;
 // extern bool open_peel;
 
-
 /***
- * control handlers, for both main.cpp and state_machine.cpp 
- * to control or initialize the motors, etc.
-*/
+ * motor control handlers, for main.cpp and state_machine.cpp
+ * to control or initialize the motors, respectively.
+ */
+class MotorControl;
 extern MotorControl motor_upper;
 extern MotorControl motor_lower;
 extern MotorControl motor_peel;
+extern MotorControl motor_rotate_lower;

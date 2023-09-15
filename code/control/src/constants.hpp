@@ -3,7 +3,7 @@
 /********************* PARAMETERS *********************
  ***********************************************************/
 
-// motors specifics
+// Motors Specifics
 // assume the motor will run at max rpm when pwm to enable pin is pwm_max
 const int rpm_max = 30;
 const int pwm_max = 255;
@@ -11,25 +11,24 @@ const int pwm_max = 255;
 const int pwm_write_max = 255;
 const int pwm_read_max = 1023;
 
-// encoder specifics
+// Encoder Specifics
 // click per revolution
 const int cpr = 360;
-// gear reuction rate
+// gear reduction rate
 const int grr = 34;
 
-// the lead of the screw, in cm
+// screw lead, in cm
 const float screw_lead = 0.5;
 
-// Pressure and speed control
+// Pressure and Speed Control
 
-// this is the desired rpm in the UP and DOWN stage, directly controlling the
-// speed of the lower motor coarsely
+// this is the desired rpm in various stages
 const int rpm_target_close = 20;
 const int rpm_target_up_down = 20;
 const int rpm_target_peel = 20;
 const int rpm_target_open = 30;
 
-// pressure reading is lower when the pressure on sensor is higher
+// @note: pressure reading is lower when the pressure on sensor is higher
 
 // used in CLOSE to determine if the upper motor should stop
 const int pressure_touch = 980;
@@ -51,4 +50,6 @@ const float ratio = 0.2;
 
 
 // height to lift after the fruit is grasped by the clamping blades, in cm
-const int up_height = 10;
+const int up_height = 20;
+// height to peel after the fruit is lifted up from the bowl
+const float peel_height = 15;
