@@ -14,8 +14,10 @@ const int pwm_read_max = 1023;
 // Encoder Specifics
 // click per revolution
 const int cpr = 360;
+const int cpr_rotate = 360;
 // gear reduction rate
 const int grr = 34;
+const int grr_rotate = 34;
 
 // screw lead, in cm
 const float screw_lead = 0.5;
@@ -26,6 +28,7 @@ const float screw_lead = 0.5;
 const int rpm_target_close = 20;
 const int rpm_target_up_down = 20;
 const int rpm_target_peel = 20;
+const int rpm_target_rotate = 20;
 const int rpm_target_open = 30;
 
 // @note: pressure reading is lower when the pressure on sensor is higher
@@ -47,9 +50,7 @@ const float kp = 3, ki = 0.1, kd = 0;
 const float gamma = 1;
 const float ratio = 0.2;
 
-
-
 // height to lift after the fruit is grasped by the clamping blades, in cm
-const int up_height = 20;
-// height to peel after the fruit is lifted up from the bowl
-const float peel_height = 15;
+const float height_up = 10;
+// the total distance between the two clamping blades, when separated, in cm
+const float height_total = 20;

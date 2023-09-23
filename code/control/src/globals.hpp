@@ -14,16 +14,13 @@
  * later controlled by motor control loop and used by motor control.
  */
 extern bool close_upper;
+extern bool peel_down_downwards;
 
-extern float height_remaining_upper;
-extern float height_remaining_lower;
-extern float height_remaining_peel;
+extern float height_upper;
+extern float height_lower;
+extern float height_peel;
 
-extern float peel_height;
-
-// extern bool open_upper;
-// extern bool open_lower;
-// extern bool open_peel;
+extern float height_to_peel;
 
 /***
  * motor control handlers, for main.cpp and state_machine.cpp

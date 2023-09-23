@@ -6,7 +6,7 @@
  *
  * @details
  * The machine exposes two buttons, a start-stop button and a self cleaning
- * button. 
+ * button.
  *
  * The machine has several states: STOPPED, RUNNING, EXITING, CLEANING.
  *
@@ -33,12 +33,12 @@
  * 3. (STATE: PEEL)
  * (At this time the lower clamping blades or the bottom of the fruit is at a
  * fixed pre-determined height, which will be the height at which the peeling
- * blades should descend to when finishing the peeling process). The peeling
- * starts and the clamping blades will rotate the fruit while the peeling blades
- * move downwards. The peeling blade is placed on the inner surface of the
- * machine, and the fruit is rotated against the blade to peel. When the peeling
- * blade reaches the height of the lower clamping blade, then the machine will
- * go to next stage.
+ * blades should be descended to to finish the peeling process).
+ * The peeling starts and the lower clamping blades will rotate the fruit while
+ * the peeling blades move downwards. The peeling blade is placed on the inner
+ * surface of the machine, and the fruit is rotated against the blade to peel.
+ * When the peeling blade reaches the height of the lower clamping blade, the
+ * machine will go to next stage.
  *
  * ==============================  STATE: EXITING ==============================
  * If the above stage finishes, the machine will go to the EXITING stage.
@@ -126,10 +126,6 @@
  * @param height_remaining_peel: initialized to the height that the peeling
  * blade should move down.
  *
- *
- * @version 0.1
- * @date 2023-07-01
- *
  * @copyright Copyright (c) 2023
  *
  */
@@ -147,15 +143,16 @@ StateMachine state_machine{State::STOPPED};
 
 MotorControl motor_upper{pin_in2_upper, pin_in1_upper, pin_ena_upper};
 MotorControl motor_lower{pin_in3_lower, pin_in4_lower, pin_enb_lower};
-MotorControl motor_peel{pin_in3_peel, pin_in4_peel, pin_enb_peel};
-MotorControl motor_rotate_lower{pin_in1_rotate_lower, pin_in2_rotate_lower,
-                                pin_ena_rotate_lower};
+MotorControl motor_peel{pin_in1_peel, pin_in2_peel, pin_ena_peel};
+MotorControl motor_rotate_lower{pin_in3_rotate_lower, pin_in4_rotate_lower,
+                                pin_enb_rotate_lower};
 
 /********************* GLOBAL VARIABLES *********************
  ***********************************************************/
 volatile unsigned int counter_upper = 0;
 volatile unsigned int counter_lower = 0;
 volatile unsigned int counter_peel = 0;
+volatile unsigned int counter_rotate = 0;
 
 // read of the pressure sensor on the upper clamping blade
 int pressure = 0;
@@ -168,12 +165,13 @@ const unsigned long control_interval_motors = 50;
 
 /************************** STATE VARIABLES ****************/
 bool close_upper = true;
+bool peel_down_downwards = true;
 
-float height_remaining_upper = 0;
-float height_remaining_lower = 0;
-float height_remaining_peel = 0;
+float height_upper = 0;
+float height_lower = 0;
+float height_peel = 0;
 
-float peel_height = 0;
+float height_to_peel = height_total;
 
 /********************* FUNCTIONS *********************
  ***********************************************************/
@@ -186,6 +184,7 @@ void motor_control_loop();
 void counter_upper_increment() { counter_upper++; }
 void counter_lower_increment() { counter_lower++; }
 void counter_peel_increment() { counter_peel++; }
+void counter_rotate_increment() { counter_rotate++; }
 
 void setup() {
     Serial.begin(115200);
@@ -203,6 +202,8 @@ void setup() {
                     counter_lower_increment, RISING);
     attachInterrupt(digitalPinToInterrupt(pin_encoder_peel),
                     counter_peel_increment, RISING);
+    attachInterrupt(digitalPinToInterrupt(pin_encoder_rotate),
+                    counter_rotate_increment, RISING);
 }
 
 void loop() {
@@ -241,7 +242,7 @@ void loop() {
     pressure_screw_rod_lower = analogRead(pin_pressure_screw_rod_lower);
     pressure_screw_rod_peel = analogRead(pin_pressure_screw_rod_peel);
 
-    if (pressure < pressure_threshold_lower or 
+    if (pressure < pressure_threshold_lower or
         pressure_screw_rod_upper < pressure_threshold_lower or
         pressure_screw_rod_lower < pressure_threshold_lower or
         pressure_screw_rod_peel < pressure_threshold_lower) {
@@ -260,16 +261,17 @@ void init_pins() {
     pinMode(pin_in4_lower, OUTPUT);
     pinMode(pin_enb_lower, OUTPUT);
 
-    pinMode(pin_ena_rotate_lower, OUTPUT);
-    pinMode(pin_in1_rotate_lower, OUTPUT);
-    pinMode(pin_in2_rotate_lower, OUTPUT);
-    pinMode(pin_in3_peel, OUTPUT);
-    pinMode(pin_in4_peel, OUTPUT);
-    pinMode(pin_enb_peel, OUTPUT);
+    pinMode(pin_ena_peel, OUTPUT);
+    pinMode(pin_in1_peel, OUTPUT);
+    pinMode(pin_in2_peel, OUTPUT);
+    pinMode(pin_in3_rotate_lower, OUTPUT);
+    pinMode(pin_in4_rotate_lower, OUTPUT);
+    pinMode(pin_enb_rotate_lower, OUTPUT);
 
     pinMode(pin_encoder_upper, INPUT);
     pinMode(pin_encoder_lower, INPUT);
     pinMode(pin_encoder_peel, INPUT);
+    pinMode(pin_encoder_rotate, INPUT);
 
     pinMode(pin_pressure_screw_rod_upper, INPUT);
     pinMode(pin_pressure_screw_rod_lower, INPUT);
@@ -341,6 +343,8 @@ void close() {
                              ((float)control_interval_motors / 1000) * 60 /
                              cpr / grr;
 
+        height_to_peel -= (float)counter_upper / cpr / grr * screw_lead;
+
         counter_upper = 0;
         counter_peel = 0;
 
@@ -363,15 +367,15 @@ void close() {
                               ((float)control_interval_motors / 1000) * 60 /
                               cpr / grr;
 
+        height_to_peel -= (float)counter_lower / cpr / grr * screw_lead;
+
         counter_lower = 0;
 
         motor_lower.set_rpm(rpm_cur_lower, rpm_target_close);
 
         // the lower clamping blade secures the fruit
-        if (pressure < pressure_grasp) {
-            reset_motors();
-            state_machine.next();
-        }
+        if (pressure < pressure_grasp)
+            reset_motors(), state_machine.next();
     }
 }
 
@@ -389,9 +393,9 @@ void up() {
     float rpm_cur_peel = (float)counter_peel / cpr / grr /
                          ((float)control_interval_motors / 1000) * 60;
 
-    height_remaining_upper -= (float)counter_upper / cpr / grr * screw_lead;
-    height_remaining_lower -= (float)counter_lower / cpr / grr * screw_lead;
-    height_remaining_peel -= (float)counter_peel / cpr / grr * screw_lead;
+    height_upper += (float)counter_upper / cpr / grr * screw_lead;
+    height_lower += (float)counter_lower / cpr / grr * screw_lead;
+    height_peel += (float)counter_peel / cpr / grr * screw_lead;
 
     counter_upper = 0;
     counter_lower = 0;
@@ -401,23 +405,15 @@ void up() {
     motor_lower.set_rpm(rpm_cur_lower, rpm_target_up_down);
     motor_peel.set_rpm(rpm_cur_peel, rpm_target_up_down);
 
-    if (height_remaining_upper <= 0) {
+    if (height_upper >= height_up and height_lower >= height_up and
+        height_peel >= height_up)
+        reset_motors(), state_machine.next();
+    if (height_upper >= height_up)
         motor_upper.set_direction(Direction::STOP);
-    }
-    if (height_remaining_lower <= 0) {
+    if (height_lower >= height_up)
         motor_lower.set_direction(Direction::STOP);
-    }
-    if (height_remaining_peel <= 0) {
+    if (height_peel >= height_up)
         motor_peel.set_direction(Direction::STOP);
-    }
-
-    if (height_remaining_upper <= 0 && height_remaining_lower <= 0 &&
-        height_remaining_peel <= 0) {
-        /// TODO: should set @param peel_height before calling
-        /// state_machine.next()
-        reset_motors();
-        state_machine.next();
-    }
 }
 
 /**
@@ -427,17 +423,19 @@ void up() {
 void peel() {
     float rpm_cur_peel = (float)counter_peel / cpr / grr /
                          ((float)control_interval_motors / 1000) * 60;
+    float rpm_cur_rotate = (float)counter_rotate / cpr_rotate / grr_rotate /
+                           ((float)control_interval_motors / 1000) * 60;
 
-    height_remaining_peel -= (float)counter_peel / cpr / grr * screw_lead;
+    height_peel -= (float)counter_peel / cpr / grr * screw_lead;
 
     counter_peel = 0;
+    counter_rotate = 0;
 
     motor_peel.set_rpm(rpm_cur_peel, rpm_target_peel);
+    motor_rotate_lower.set_rpm(rpm_cur_rotate, rpm_target_rotate);
 
-    if (height_remaining_peel <= 0) {
-        reset_motors();
-        state_machine.next();
-    }
+    if (height_peel <= height_up - height_peel)
+        reset_motors(), state_machine.next();
 }
 
 /**
@@ -452,14 +450,10 @@ void down() {
     float rpm_cur_peel = (float)counter_peel / cpr / grr /
                          ((float)control_interval_motors / 1000) * 60;
 
-    /**
-     * @brief TODO: remove these lines. We only use pressure < pressure touch
-     * bowl to detect if the fruit has been placed back to the holding bowl.
-     *  and we do not move down the peeling blade.
-     */
-    height_remaining_upper -= (float)counter_upper / cpr / grr * screw_lead;
-    height_remaining_lower -= (float)counter_lower / cpr / grr * screw_lead;
-    // height_remaining_peel -= (float)counter_peel / cpr / grr * screw_lead;
+    height_upper -= (float)counter_upper / cpr / grr * screw_lead;
+    height_lower -= (float)counter_lower / cpr / grr * screw_lead;
+    height_peel -= (float)counter_peel / cpr / grr * screw_lead *
+                   (peel_down_downwards ? 1 : -1);
 
     counter_upper = 0;
     counter_lower = 0;
@@ -467,13 +461,16 @@ void down() {
 
     motor_upper.set_rpm(rpm_cur_upper, rpm_target_up_down);
     motor_lower.set_rpm(rpm_cur_lower, rpm_target_up_down);
-    // motor_peel.set_rpm(rpm_cur_peel, rpm_target_up_down);
+    motor_peel.set_rpm(rpm_cur_peel, rpm_target_up_down);
 
-    // the fruit has touched the bowl
-    if (pressure < pressure_touch_bowl) {
-        reset_motors();
-        state_machine.next();
-    }
+    bool peel_zero = (peel_down_downwards ? 1 : -1) * height_peel <= 0;
+    bool touch_fruit = pressure < pressure_touch_bowl;
+    if (peel_zero and touch_fruit)
+        reset_motors(), state_machine.next();
+    if (peel_zero)
+        motor_peel.set_direction(Direction::STOP);
+    if (touch_fruit)
+        motor_upper.set_direction(Direction::STOP);
 }
 
 void open() {
@@ -492,19 +489,14 @@ void open() {
     motor_lower.set_rpm(rpm_cur_lower, rpm_target_open);
     motor_peel.set_rpm(rpm_cur_peel, rpm_target_open);
 
-    if (pressure_screw_rod_upper < pressure_threshold_lower) {
-        motor_upper.set_direction(Direction::STOP);
-    }
-    if (pressure_screw_rod_lower < pressure_threshold_lower) {
-        motor_lower.set_direction(Direction::STOP);
-    }
-    if (pressure_screw_rod_peel < pressure_threshold_lower) {
-        motor_peel.set_direction(Direction::STOP);
-    }
     if (pressure_screw_rod_upper < pressure_threshold_lower &&
         pressure_screw_rod_lower < pressure_threshold_lower &&
-        pressure_screw_rod_peel < pressure_threshold_lower) {
-        reset_motors();
-        state_machine.next();
-    }
+        pressure_screw_rod_peel < pressure_threshold_lower)
+        reset_motors(), state_machine.next();
+    if (pressure_screw_rod_upper < pressure_threshold_lower)
+        motor_upper.set_direction(Direction::STOP);
+    if (pressure_screw_rod_lower < pressure_threshold_lower)
+        motor_lower.set_direction(Direction::STOP);
+    if (pressure_screw_rod_peel < pressure_threshold_lower)
+        motor_peel.set_direction(Direction::STOP);
 }
