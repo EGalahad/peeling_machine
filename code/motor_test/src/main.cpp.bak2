@@ -1,0 +1,46 @@
+#include "FlexiTimer2.h"
+#include <Arduino.h>
+
+#include "constants.hpp"
+#include "motor_utils.hpp"
+#include "pins.hpp"
+
+MotorControl motor_rotate(pin_in3_rotate_lower, pin_in4_rotate_lower,
+                          pin_enb_rotate_lower);
+
+volatile int encoder_rotate_count = 0;
+
+void encoder_rotate_isr() { encoder_rotate_count++; }
+
+const unsigned long control_loop_period = 50;
+void motor_control_loop();
+
+void setup() {
+    Serial.begin(115200);
+    pinMode(pin_in3_rotate_lower, OUTPUT);
+    pinMode(pin_in4_rotate_lower, OUTPUT);
+    pinMode(pin_enb_rotate_lower, OUTPUT);
+
+    pinMode(pin_encoder_rotate, INPUT_PULLUP);
+
+    attachInterrupt(digitalPinToInterrupt(pin_encoder_rotate),
+                    encoder_rotate_isr, RISING);
+
+    FlexiTimer2::set(control_loop_period, motor_control_loop);
+    FlexiTimer2::start();
+}
+
+void loop() {}
+
+void motor_control_loop() {
+    analogWrite(pin_enb_rotate_lower, 255);
+    motor_rotate.set_direction(Direction::DOWN);
+
+    float rpm_rotate = (float)encoder_rotate_count / ((float)control_loop_period) *
+                       1000 * 60 / cpr_rotate / grr_rotate;
+
+    Serial.print("rpm_rotate: ");
+    Serial.println(rpm_rotate);
+
+    encoder_rotate_count = 0;
+}

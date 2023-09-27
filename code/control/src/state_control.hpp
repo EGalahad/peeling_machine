@@ -36,7 +36,7 @@ enum class Signal {
 
 /**
  * The state machine does all the state transition under the hood.
- * 
+ *
  * The state transition can be invoked by directly invocation of the `next()`
  * method or sending signals through the `trigger_signal()` method.
  *
@@ -61,6 +61,7 @@ class StateMachine {
      *
      * @return state (State): the new state the machine is in.
      */
+    void reset() { state = State::STOPPED; }
     State next();
     const State get_state() const { return state; }
 

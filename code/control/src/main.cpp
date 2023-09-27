@@ -144,8 +144,12 @@ StateMachine state_machine{State::STOPPED};
 MotorControl motor_upper{pin_in2_upper, pin_in1_upper, pin_ena_upper};
 MotorControl motor_lower{pin_in3_lower, pin_in4_lower, pin_enb_lower};
 MotorControl motor_peel{pin_in1_peel, pin_in2_peel, pin_ena_peel};
-MotorControl motor_rotate_lower{pin_in3_rotate_lower, pin_in4_rotate_lower,
-                                pin_enb_rotate_lower};
+MotorControl motor_rotate_lower{pin_in3_rotate_lower,
+                                pin_in4_rotate_lower,
+                                pin_enb_rotate_lower,
+                                10,
+                                0.1,
+                                0.1};
 
 /********************* GLOBAL VARIABLES *********************
  ***********************************************************/
@@ -193,7 +197,6 @@ void setup() {
 
     // run motor controlling loop using FlexiTimer
     FlexiTimer2::set(control_interval_motors, motor_control_loop);
-    FlexiTimer2::start();
 
     // attach interrupts for encoders
     attachInterrupt(digitalPinToInterrupt(pin_encoder_upper),
@@ -218,6 +221,7 @@ void loop() {
         if (start_stop_button_state == HIGH) {
             reset_motors();
             state_machine.trigger_signal(Signal::BUTTON_START_STOP);
+            Serial.println("start_stop button pressed!");
         }
         last_start_stop_button_state = start_stop_button_state;
         last_self_clean_button_state = self_clean_button_state;
@@ -229,6 +233,7 @@ void loop() {
         if (self_clean_button_state == HIGH) {
             reset_motors();
             state_machine.trigger_signal(Signal::BUTTON_SELF_CLEAN);
+            Serial.println("self_clean button pressed!");
         }
         last_start_stop_button_state = start_stop_button_state;
         last_self_clean_button_state = self_clean_button_state;
@@ -247,6 +252,68 @@ void loop() {
         pressure_screw_rod_lower < pressure_threshold_lower or
         pressure_screw_rod_peel < pressure_threshold_lower) {
         state_machine.trigger_signal(Signal::PRESSURE_LOWER_THRESHOLD_EXCEEDED);
+    }
+
+    static bool motor_control_loop_started = false;
+    if (not motor_control_loop_started) {
+        state_machine.reset();
+        FlexiTimer2::start();
+        motor_control_loop_started = true;
+    }
+
+    static unsigned long last_log_time = millis();
+    if (millis() - last_log_time > 10000) {
+        Serial.println("=============Loop=================");
+        Serial.print("state: ");
+        switch (state_machine.get_state()) {
+        case State::STOPPED:
+            Serial.println("STOPPED");
+            break;
+        case State::CLOSE:
+            Serial.println("CLOSE");
+            break;
+        case State::UP:
+            Serial.println("UP");
+            break;
+        case State::PEEL:
+            Serial.println("PEEL");
+            break;
+        case State::DOWN:
+            Serial.println("DOWN");
+            break;
+        case State::OPEN:
+            Serial.println("OPEN");
+            break;
+        case State::CLEANING:
+            Serial.println("CLEANING");
+            break;
+        case State::ERROR:
+            Serial.println("ERROR");
+            break;
+
+        default:
+            break;
+        }
+        Serial.print("height_upper: ");
+        Serial.print(height_upper);
+        Serial.print(", height_lower: ");
+        Serial.print(height_lower);
+        Serial.print(", height_peel: ");
+        Serial.print(height_peel);
+        Serial.print(", height_to_peel: ");
+        Serial.println(height_to_peel);
+
+        Serial.print("pressure: ");
+        Serial.print(pressure);
+        Serial.print(", pressure_screw_rod_upper: ");
+        Serial.print(pressure_screw_rod_upper);
+        Serial.print(", pressure_screw_rod_lower: ");
+        Serial.print(pressure_screw_rod_lower);
+        Serial.print(", pressure_screw_rod_peel: ");
+        Serial.println(pressure_screw_rod_peel);
+        Serial.println();
+
+        last_log_time = millis();
     }
 }
 
@@ -361,6 +428,14 @@ void close() {
             motor_upper.set_direction(Direction::STOP);
             motor_peel.set_direction(Direction::STOP);
             motor_lower.set_direction(Direction::UP);
+
+            Serial.print("pressure=");
+            Serial.print(pressure);
+            Serial.print(" < pressure_touch=");
+            Serial.print(pressure_touch);
+
+            Serial.println(
+                ", Entering sub state transition: close lower clamping blade!");
         }
     } else {
         float rpm_cur_lower = counter_lower /
@@ -388,7 +463,7 @@ void close() {
 void up() {
     float rpm_cur_upper = (float)counter_upper / cpr / grr /
                           ((float)control_interval_motors / 1000) * 60;
-    float rpm_cur_lower = counter_lower / cpr / grr /
+    float rpm_cur_lower = (float)counter_lower / cpr / grr /
                           ((float)control_interval_motors / 1000) * 60;
     float rpm_cur_peel = (float)counter_peel / cpr / grr /
                          ((float)control_interval_motors / 1000) * 60;
@@ -421,6 +496,8 @@ void up() {
  * moved down.
  */
 void peel() {
+    motor_peel.set_direction(Direction::DOWN);
+
     float rpm_cur_peel = (float)counter_peel / cpr / grr /
                          ((float)control_interval_motors / 1000) * 60;
     float rpm_cur_rotate = (float)counter_rotate / cpr_rotate / grr_rotate /
@@ -428,14 +505,27 @@ void peel() {
 
     height_peel -= (float)counter_peel / cpr / grr * screw_lead;
 
-    counter_peel = 0;
-    counter_rotate = 0;
-
     motor_peel.set_rpm(rpm_cur_peel, rpm_target_peel);
     motor_rotate_lower.set_rpm(rpm_cur_rotate, rpm_target_rotate);
 
-    if (height_peel <= height_up - height_peel)
+    if (height_peel <= height_up - height_to_peel)
         reset_motors(), state_machine.next();
+
+    static unsigned long last_log_time = millis();
+    if (millis() - last_log_time > 1000) {
+        last_log_time = millis();
+        Serial.print("counter_peel: ");
+        Serial.print(counter_peel);
+        Serial.print(", counter_rotate: ");
+        Serial.print(counter_rotate);
+        Serial.print(", rpm_cur_peel: ");
+        Serial.print(rpm_cur_peel);
+        Serial.print(", rpm_cur_rotate: ");
+        Serial.println(rpm_cur_rotate);
+    }
+
+    counter_peel = 0;
+    counter_rotate = 0;
 }
 
 /**

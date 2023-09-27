@@ -14,10 +14,10 @@ const int pwm_read_max = 1023;
 // Encoder Specifics
 // click per revolution
 const int cpr = 360;
-const int cpr_rotate = 6;
+const int cpr_rotate = 360;
 // gear reduction rate
 const int grr = 34;
-const int grr_rotate = 90;
+const int grr_rotate = 34;
 
 // screw lead, in cm
 const float screw_lead = 0.5;
@@ -25,11 +25,11 @@ const float screw_lead = 0.5;
 // Pressure and Speed Control
 
 // this is the desired rpm in various stages
-const int rpm_target_close = 60;
+const int rpm_target_close = 20;
 const int rpm_target_up_down = 60;
-const int rpm_target_peel = 60;
-const int rpm_target_rotate = 20;
-const int rpm_target_open = 90;
+const int rpm_target_peel = 20;
+const int rpm_target_rotate = 4;
+const int rpm_target_open = 30;
 
 // @note: pressure reading is lower when the pressure on sensor is higher
 
@@ -46,7 +46,7 @@ const int pressure_touch_bowl = 880;
 const int pressure_threshold_lower = 840;
 
 // PID control parameters
-const float kp_default = 3, ki_default = 0.1, kd_default = 0;
+const float kp = 3, ki = 0.1, kd = 0;
 const float gamma = 1;
 const float ratio = 0.2;
 
