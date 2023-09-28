@@ -42,6 +42,9 @@ const int pressure_grasp = 950;
 // used in DOWN to determine if the fruit touches the holding bowl
 const int pressure_touch_bowl = 880;
 
+// used in OPEN to determine if the upper/lower/peel screw rod motor should stop
+const int pressure_screw_rod_end_of_range = 880;
+
 // pressure too high, warning!
 const int pressure_threshold_lower = 840;
 

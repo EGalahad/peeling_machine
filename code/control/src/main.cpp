@@ -535,7 +535,7 @@ void peel() {
 void down() {
     float rpm_cur_upper = (float)counter_upper / cpr / grr /
                           ((float)control_interval_motors / 1000) * 60;
-    float rpm_cur_lower = counter_lower / cpr / grr /
+    float rpm_cur_lower = (float)counter_lower / cpr / grr /
                           ((float)control_interval_motors / 1000) * 60;
     float rpm_cur_peel = (float)counter_peel / cpr / grr /
                          ((float)control_interval_motors / 1000) * 60;
@@ -544,10 +544,6 @@ void down() {
     height_lower -= (float)counter_lower / cpr / grr * screw_lead;
     height_peel -= (float)counter_peel / cpr / grr * screw_lead *
                    (peel_down_downwards ? 1 : -1);
-
-    counter_upper = 0;
-    counter_lower = 0;
-    counter_peel = 0;
 
     motor_upper.set_rpm(rpm_cur_upper, rpm_target_up_down);
     motor_lower.set_rpm(rpm_cur_lower, rpm_target_up_down);
@@ -561,12 +557,33 @@ void down() {
         motor_peel.set_direction(Direction::STOP);
     if (touch_fruit)
         motor_upper.set_direction(Direction::STOP);
+    
+    static unsigned long last_log_time = millis();
+    if (millis() - last_log_time > 1000) {
+        last_log_time = millis();
+        Serial.print("counter_upper: ");
+        Serial.print(counter_upper);
+        Serial.print(", counter_lower: ");
+        Serial.print(counter_lower);
+        Serial.print(", counter_peel: ");
+        Serial.print(counter_peel);
+        Serial.print(", rpm_cur_upper: ");
+        Serial.print(rpm_cur_upper);
+        Serial.print(", rpm_cur_lower: ");
+        Serial.print(rpm_cur_lower);
+        Serial.print(", rpm_cur_peel: ");
+        Serial.println(rpm_cur_peel);
+    }
+
+    counter_upper = 0;
+    counter_lower = 0;
+    counter_peel = 0;
 }
 
 void open() {
     float rpm_cur_upper = (float)counter_upper / cpr / grr /
                           ((float)control_interval_motors / 1000) * 60;
-    float rpm_cur_lower = counter_lower / cpr / grr /
+    float rpm_cur_lower = (float)counter_lower / cpr / grr /
                           ((float)control_interval_motors / 1000) * 60;
     float rpm_cur_peel = (float)counter_peel / cpr / grr /
                          ((float)control_interval_motors / 1000) * 60;
@@ -579,14 +596,14 @@ void open() {
     motor_lower.set_rpm(rpm_cur_lower, rpm_target_open);
     motor_peel.set_rpm(rpm_cur_peel, rpm_target_open);
 
-    if (pressure_screw_rod_upper < pressure_threshold_lower &&
-        pressure_screw_rod_lower < pressure_threshold_lower &&
-        pressure_screw_rod_peel < pressure_threshold_lower)
+    if (pressure_screw_rod_upper < pressure_screw_rod_end_of_range &&
+        pressure_screw_rod_lower < pressure_screw_rod_end_of_range &&
+        pressure_screw_rod_peel < pressure_screw_rod_end_of_range)
         reset_motors(), state_machine.next();
-    if (pressure_screw_rod_upper < pressure_threshold_lower)
+    if (pressure_screw_rod_upper < pressure_screw_rod_end_of_range)
         motor_upper.set_direction(Direction::STOP);
-    if (pressure_screw_rod_lower < pressure_threshold_lower)
+    if (pressure_screw_rod_lower < pressure_screw_rod_end_of_range)
         motor_lower.set_direction(Direction::STOP);
-    if (pressure_screw_rod_peel < pressure_threshold_lower)
+    if (pressure_screw_rod_peel < pressure_screw_rod_end_of_range)
         motor_peel.set_direction(Direction::STOP);
 }
