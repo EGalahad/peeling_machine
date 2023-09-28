@@ -140,6 +140,9 @@ void up_init_state() {
 }
 
 void peel_init_state() {
+    Serial.println();
+    Serial.println("peel_init_state");
+
     // init motor state
     motor_peel.set_direction(Direction::DOWN);
     motor_rotate_lower.set_direction(Direction::UP);
@@ -156,10 +159,8 @@ void down_init_state() {
 }
 
 void open_init_state() {
-    // // init state variable
-    // open_upper = true;
-    // open_lower = true;
-    // open_peel = true;
+    Serial.println();
+    Serial.println("open_init_state");
 
     // init motor state
     motor_upper.set_direction(Direction::UP);

@@ -262,8 +262,8 @@ void loop() {
     }
 
     static unsigned long last_log_time = millis();
-    if (millis() - last_log_time > 10000) {
-        Serial.println("=============Loop=================");
+    if (millis() - last_log_time > 5000) {
+        Serial.println();
         Serial.print("state: ");
         switch (state_machine.get_state()) {
         case State::STOPPED:
@@ -556,7 +556,8 @@ void down() {
     if (peel_zero)
         motor_peel.set_direction(Direction::STOP);
     if (touch_fruit)
-        motor_upper.set_direction(Direction::STOP);
+        motor_upper.set_direction(Direction::STOP),
+        motor_lower.set_direction(Direction::STOP);
     
     static unsigned long last_log_time = millis();
     if (millis() - last_log_time > 1000) {
@@ -581,16 +582,16 @@ void down() {
 }
 
 void open() {
+    motor_upper.set_direction(Direction::UP);
+    motor_lower.set_direction(Direction::DOWN);
+    motor_peel.set_direction(Direction::UP);
+
     float rpm_cur_upper = (float)counter_upper / cpr / grr /
                           ((float)control_interval_motors / 1000) * 60;
     float rpm_cur_lower = (float)counter_lower / cpr / grr /
                           ((float)control_interval_motors / 1000) * 60;
     float rpm_cur_peel = (float)counter_peel / cpr / grr /
                          ((float)control_interval_motors / 1000) * 60;
-
-    counter_upper = 0;
-    counter_lower = 0;
-    counter_peel = 0;
 
     motor_upper.set_rpm(rpm_cur_upper, rpm_target_open);
     motor_lower.set_rpm(rpm_cur_lower, rpm_target_open);
@@ -606,4 +607,25 @@ void open() {
         motor_lower.set_direction(Direction::STOP);
     if (pressure_screw_rod_peel < pressure_screw_rod_end_of_range)
         motor_peel.set_direction(Direction::STOP);
+
+    static unsigned long last_log_time = millis();
+    if (millis() - last_log_time > 1000) {
+        last_log_time = millis();
+        Serial.print("counter_upper: ");
+        Serial.print(counter_upper);
+        Serial.print(", counter_lower: ");
+        Serial.print(counter_lower);
+        Serial.print(", counter_peel: ");
+        Serial.print(counter_peel);
+        Serial.print(", rpm_cur_upper: ");
+        Serial.print(rpm_cur_upper);
+        Serial.print(", rpm_cur_lower: ");
+        Serial.print(rpm_cur_lower);
+        Serial.print(", rpm_cur_peel: ");
+        Serial.println(rpm_cur_peel);
+    }
+
+    counter_upper = 0;
+    counter_lower = 0;
+    counter_peel = 0;
 }
