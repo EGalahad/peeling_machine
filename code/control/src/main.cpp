@@ -133,6 +133,7 @@
 #include <FlexiTimer2.h>
 
 #include "motor_utils.hpp"
+#include "sensor_utils.hpp"
 #include "state_control.hpp"
 
 #include "constants.hpp"
@@ -143,13 +144,18 @@ StateMachine state_machine{State::STOPPED};
 
 MotorControl motor_upper{pin_in2_upper, pin_in1_upper, pin_ena_upper};
 MotorControl motor_lower{pin_in3_lower, pin_in4_lower, pin_enb_lower};
-MotorControl motor_peel{pin_in1_peel, pin_in2_peel, pin_ena_peel};
+MotorControl motor_peel{pin_in2_peel, pin_in1_peel, pin_ena_peel};
 MotorControl motor_rotate_lower{pin_in3_rotate_lower,
                                 pin_in4_rotate_lower,
                                 pin_enb_rotate_lower,
                                 10,
                                 0.1,
                                 0.1};
+
+PressureSensor pressure_sensor{pin_pressure_clamp_upper_dout, pin_pressure_clamp_upper_sck};
+TouchSensor touch_sensor_upper{pin_touch_screw_rod_upper};
+TouchSensor touch_sensor_lower{pin_touch_screw_rod_lower};
+TouchSensor touch_sensor_peel{pin_touch_screw_rod_peel};
 
 /********************* GLOBAL VARIABLES *********************
  ***********************************************************/
@@ -158,11 +164,11 @@ volatile unsigned int counter_lower = 0;
 volatile unsigned int counter_peel = 0;
 volatile unsigned int counter_rotate = 0;
 
-// read of the pressure sensor on the upper clamping blade
-int pressure = 0;
-int pressure_screw_rod_upper = 0;
-int pressure_screw_rod_lower = 0;
-int pressure_screw_rod_peel = 0;
+// // read of the pressure sensor on the upper clamping blade
+// int pressure = 0;
+// int pressure_screw_rod_upper = 0;
+// int pressure_screw_rod_lower = 0;
+// int pressure_screw_rod_peel = 0;
 
 // control interval
 const unsigned long control_interval_motors = 50;
@@ -177,6 +183,11 @@ float height_peel = 0;
 
 float height_to_peel = height_total;
 
+float spray_time_start = 0;
+bool close_cleaning = false;
+bool spray_cleaning = false;
+bool open_cleaning = false;
+
 /********************* FUNCTIONS *********************
  ***********************************************************/
 
@@ -190,6 +201,21 @@ void counter_lower_increment() { counter_lower++; }
 void counter_peel_increment() { counter_peel++; }
 void counter_rotate_increment() { counter_rotate++; }
 
+#define PRESSURE_DEBUG
+#ifdef PRESSURE_DEBUG
+void setup() {
+    Serial.begin(115200);
+    init_pins();
+    reset_motors();
+}
+
+void loop() {
+    // output pressure sensor readings
+    Serial.print("pressure: ");
+    Serial.print(pressure_sensor.get_pressure());
+    delay(1000);
+}
+#else
 void setup() {
     Serial.begin(115200);
     init_pins();
@@ -211,8 +237,10 @@ void setup() {
 
 void loop() {
     // constantly check external signals
-    static bool last_start_stop_button_state = LOW;
-    static bool last_self_clean_button_state = LOW;
+    static bool last_start_stop_button_state =
+        digitalRead(pin_start_stop_button);
+    static bool last_self_clean_button_state =
+        digitalRead(pin_self_cleaning_button);
 
     bool start_stop_button_state = digitalRead(pin_start_stop_button);
     bool self_clean_button_state = digitalRead(pin_self_cleaning_button);
@@ -242,16 +270,14 @@ void loop() {
     }
 
     // read pressure
-    pressure = analogRead(pin_pressure_clamp_upper);
-    pressure_screw_rod_upper = analogRead(pin_pressure_screw_rod_upper);
-    pressure_screw_rod_lower = analogRead(pin_pressure_screw_rod_lower);
-    pressure_screw_rod_peel = analogRead(pin_pressure_screw_rod_peel);
+    int pressure = pressure_sensor.get_pressure();
 
-    if (pressure < pressure_threshold_lower or
-        pressure_screw_rod_upper < pressure_threshold_lower or
-        pressure_screw_rod_lower < pressure_threshold_lower or
-        pressure_screw_rod_peel < pressure_threshold_lower) {
+    if (pressure < pressure_threshold_lower) {
         state_machine.trigger_signal(Signal::PRESSURE_LOWER_THRESHOLD_EXCEEDED);
+        Serial.println("Pressure lower threshold exceeded! ");
+        Serial.print("pressure=");
+        Serial.print(pressure);
+        Serial.println();
     }
 
     static bool motor_control_loop_started = false;
@@ -262,7 +288,7 @@ void loop() {
     }
 
     static unsigned long last_log_time = millis();
-    if (millis() - last_log_time > 5000) {
+    if (millis() - last_log_time > 1000) {
         Serial.println();
         Serial.print("state: ");
         switch (state_machine.get_state()) {
@@ -305,17 +331,12 @@ void loop() {
 
         Serial.print("pressure: ");
         Serial.print(pressure);
-        Serial.print(", pressure_screw_rod_upper: ");
-        Serial.print(pressure_screw_rod_upper);
-        Serial.print(", pressure_screw_rod_lower: ");
-        Serial.print(pressure_screw_rod_lower);
-        Serial.print(", pressure_screw_rod_peel: ");
-        Serial.println(pressure_screw_rod_peel);
         Serial.println();
 
         last_log_time = millis();
     }
 }
+#endif // PRESSURE_DEBUG
 
 void init_pins() {
     pinMode(pin_start_stop_button, INPUT);
@@ -340,11 +361,12 @@ void init_pins() {
     pinMode(pin_encoder_peel, INPUT);
     pinMode(pin_encoder_rotate, INPUT);
 
-    pinMode(pin_pressure_screw_rod_upper, INPUT);
-    pinMode(pin_pressure_screw_rod_lower, INPUT);
-    pinMode(pin_pressure_screw_rod_peel, INPUT);
+    pinMode(pin_touch_screw_rod_upper, INPUT);
+    pinMode(pin_touch_screw_rod_lower, INPUT);
+    pinMode(pin_touch_screw_rod_peel, INPUT);
 
-    pinMode(pin_pressure_clamp_upper, INPUT);
+    pinMode(pin_pressure_clamp_upper_dout, INPUT);
+    pinMode(pin_pressure_clamp_upper_sck, INPUT);
 
     // pinMode(pin_water_pump_1, OUTPUT);
 }
@@ -366,6 +388,7 @@ void up();
 void peel();
 void down();
 void open();
+void clean();
 
 void motor_control_loop() {
     /// TODO: change the motor control loop to a pointer that points to
@@ -389,6 +412,10 @@ void motor_control_loop() {
 
     case State::OPEN:
         open();
+        break;
+
+    case State::CLEANING:
+        clean();
         break;
 
     default:
@@ -419,7 +446,7 @@ void close() {
         motor_peel.set_rpm(rpm_cur_peel, rpm_target_close);
 
         // the upper clamping blade touches the fruit
-        if (pressure < pressure_touch) {
+        if (pressure_sensor.get_pressure() < pressure_touch) {
             // sub state transition
             // init state variables
             close_upper = false;
@@ -430,7 +457,7 @@ void close() {
             motor_lower.set_direction(Direction::UP);
 
             Serial.print("pressure=");
-            Serial.print(pressure);
+            Serial.print(pressure_sensor.get_pressure());
             Serial.print(" < pressure_touch=");
             Serial.print(pressure_touch);
 
@@ -449,7 +476,7 @@ void close() {
         motor_lower.set_rpm(rpm_cur_lower, rpm_target_close);
 
         // the lower clamping blade secures the fruit
-        if (pressure < pressure_grasp)
+        if (pressure_sensor.get_pressure() < pressure_grasp)
             reset_motors(), state_machine.next();
     }
 }
@@ -480,15 +507,15 @@ void up() {
     motor_lower.set_rpm(rpm_cur_lower, rpm_target_up_down);
     motor_peel.set_rpm(rpm_cur_peel, rpm_target_up_down);
 
-    if (height_upper >= height_up and height_lower >= height_up and
-        height_peel >= height_up)
-        reset_motors(), state_machine.next();
     if (height_upper >= height_up)
         motor_upper.set_direction(Direction::STOP);
     if (height_lower >= height_up)
         motor_lower.set_direction(Direction::STOP);
     if (height_peel >= height_up)
         motor_peel.set_direction(Direction::STOP);
+    if (height_upper >= height_up and height_lower >= height_up and
+        height_peel >= height_up)
+        reset_motors(), state_machine.next();
 }
 
 /**
@@ -550,15 +577,15 @@ void down() {
     motor_peel.set_rpm(rpm_cur_peel, rpm_target_up_down);
 
     bool peel_zero = (peel_down_downwards ? 1 : -1) * height_peel <= 0;
-    bool touch_fruit = pressure < pressure_touch_bowl;
+    bool touch_fruit = pressure_sensor.get_pressure() < pressure_touch_bowl;
     if (peel_zero and touch_fruit)
         reset_motors(), state_machine.next();
     if (peel_zero)
         motor_peel.set_direction(Direction::STOP);
     if (touch_fruit)
         motor_upper.set_direction(Direction::STOP),
-        motor_lower.set_direction(Direction::STOP);
-    
+            motor_lower.set_direction(Direction::STOP);
+
     static unsigned long last_log_time = millis();
     if (millis() - last_log_time > 1000) {
         last_log_time = millis();
@@ -597,15 +624,14 @@ void open() {
     motor_lower.set_rpm(rpm_cur_lower, rpm_target_open);
     motor_peel.set_rpm(rpm_cur_peel, rpm_target_open);
 
-    if (pressure_screw_rod_upper < pressure_screw_rod_end_of_range &&
-        pressure_screw_rod_lower < pressure_screw_rod_end_of_range &&
-        pressure_screw_rod_peel < pressure_screw_rod_end_of_range)
+    if (touch_sensor_upper.is_touched() && touch_sensor_lower.is_touched() &&
+        touch_sensor_peel.is_touched())
         reset_motors(), state_machine.next();
-    if (pressure_screw_rod_upper < pressure_screw_rod_end_of_range)
+    if (touch_sensor_upper.is_touched())
         motor_upper.set_direction(Direction::STOP);
-    if (pressure_screw_rod_lower < pressure_screw_rod_end_of_range)
+    if (touch_sensor_lower.is_touched())
         motor_lower.set_direction(Direction::STOP);
-    if (pressure_screw_rod_peel < pressure_screw_rod_end_of_range)
+    if (touch_sensor_peel.is_touched())
         motor_peel.set_direction(Direction::STOP);
 
     static unsigned long last_log_time = millis();
@@ -628,4 +654,107 @@ void open() {
     counter_upper = 0;
     counter_lower = 0;
     counter_peel = 0;
+}
+
+void clean() {
+    if (close_cleaning) {
+        motor_upper.set_direction(Direction::DOWN);
+        motor_peel.set_direction(Direction::DOWN);
+        motor_lower.set_direction(Direction::UP);
+
+        float rpm_cur_upper = (float)counter_upper / cpr / grr /
+                              ((float)control_interval_motors / 1000) * 60;
+        float rpm_cur_lower = (float)counter_lower / cpr / grr /
+                              ((float)control_interval_motors / 1000) * 60;
+        float rpm_cur_peel = (float)counter_peel / cpr / grr /
+                             ((float)control_interval_motors / 1000) * 60;
+
+        motor_upper.set_rpm(rpm_cur_upper, rpm_target_close);
+        motor_peel.set_rpm(rpm_cur_peel, rpm_target_close);
+        motor_lower.set_rpm(rpm_cur_lower, rpm_target_close);
+
+        height_upper -= (float)counter_upper / cpr / grr * screw_lead;
+        height_peel -= (float)counter_peel / cpr / grr * screw_lead;
+        height_lower += (float)counter_lower / cpr / grr * screw_lead;
+
+        if (height_upper < -height_to_descend) {
+            motor_upper.set_direction(Direction::STOP);
+        }
+        if (height_peel < -height_to_descend) {
+            motor_peel.set_direction(Direction::STOP);
+        }
+        if (height_lower > height_to_descend) {
+            motor_lower.set_direction(Direction::STOP);
+        }
+        if (height_upper < -height_to_descend and
+            height_peel < -height_to_descend and
+            height_lower > height_to_descend) {
+            // sub state transition
+            // init state variables
+            close_cleaning = false;
+            spray_cleaning = true;
+            spray_time_start = millis();
+
+            // init motor state
+            motor_upper.set_direction(Direction::STOP);
+            motor_peel.set_direction(Direction::STOP);
+            motor_lower.set_direction(Direction::STOP);
+
+            Serial.println("Entering sub state transition: spray water!");
+        }
+    } else if (spray_cleaning) {
+        // spray water for some time
+        if (millis() - spray_time_start < spray_time_default * 1000) {
+            // spray water
+            Serial.println("Spraying water!");
+            delay(1000);
+        } else {
+            // sub state transition
+            // init state variables
+            spray_cleaning = false;
+            open_cleaning = true;
+
+            // init motor state
+            motor_upper.set_direction(Direction::UP);
+            motor_peel.set_direction(Direction::UP);
+            motor_lower.set_direction(Direction::DOWN);
+
+            Serial.println("Entering sub state transition: open!");
+        }
+    } else if (open_cleaning) {
+        motor_upper.set_direction(Direction::UP);
+        motor_peel.set_direction(Direction::UP);
+        motor_lower.set_direction(Direction::DOWN);
+
+        float rpm_cur_upper = (float)counter_upper / cpr / grr /
+                              ((float)control_interval_motors / 1000) * 60;
+        float rpm_cur_lower = (float)counter_lower / cpr / grr /
+                              ((float)control_interval_motors / 1000) * 60;
+        float rpm_cur_peel = (float)counter_peel / cpr / grr /
+                             ((float)control_interval_motors / 1000) * 60;
+
+        motor_upper.set_rpm(rpm_cur_upper, rpm_target_open);
+        motor_peel.set_rpm(rpm_cur_peel, rpm_target_open);
+        motor_lower.set_rpm(rpm_cur_lower, rpm_target_open);
+
+        if (touch_sensor_upper.is_touched() &&
+            touch_sensor_lower.is_touched() && touch_sensor_peel.is_touched()) {
+            // sub state transition
+            // init state variables
+            open_cleaning = false;
+
+            // init motor state
+            motor_upper.set_direction(Direction::STOP);
+            motor_peel.set_direction(Direction::STOP);
+            motor_lower.set_direction(Direction::STOP);
+
+            Serial.println("Clean finished!");
+        }
+        if (touch_sensor_upper.is_touched())
+            motor_upper.set_direction(Direction::STOP);
+        if (touch_sensor_lower.is_touched())
+            motor_lower.set_direction(Direction::STOP);
+        if (touch_sensor_peel.is_touched())
+            motor_peel.set_direction(Direction::STOP);
+    }
 }

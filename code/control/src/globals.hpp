@@ -22,6 +22,11 @@ extern float height_peel;
 
 extern float height_to_peel;
 
+extern bool close_cleaning;
+extern bool spray_cleaning;
+extern bool open_cleaning;
+extern float spray_time_start;
+
 /***
  * motor control handlers, for main.cpp and state_machine.cpp
  * to control or initialize the motors, respectively.

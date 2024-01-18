@@ -31,9 +31,9 @@ const int pin_encoder_peel = 20;
 const int pin_encoder_rotate = 21;
 
 // pressure sensors attached to the end at the range of motion of screw rods
-const int pin_pressure_screw_rod_upper = A0;
-const int pin_pressure_screw_rod_lower = A1;
-const int pin_pressure_screw_rod_peel = A2;
+const int pin_touch_screw_rod_upper = A0;
+const int pin_touch_screw_rod_lower = A1;
+const int pin_touch_screw_rod_peel = A2;
 
 // pressure sensor attached to upper clamping blade
 const int pin_pressure_clamp_upper = A3;

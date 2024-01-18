@@ -30,6 +30,7 @@ void up_init_state();
 void peel_init_state();
 void down_init_state();
 void open_init_state();
+void clean_init_state();
 
 State StateMachine::next() {
     switch (state) {
@@ -58,6 +59,7 @@ State StateMachine::next() {
         break;
 
     case State::OPEN:
+    case State::CLEANING:
         state = State::STOPPED;
         Serial.println("Entering STOPPED state.");
         break;
@@ -99,6 +101,7 @@ void StateMachine::start_stop() {
 void StateMachine::self_clean() {
     switch (state) {
     case State::STOPPED:
+        clean_init_state();
         state = State::CLEANING;
         Serial.println("Entering CLEANING state.");
         break;
@@ -166,4 +169,22 @@ void open_init_state() {
     motor_upper.set_direction(Direction::UP);
     motor_peel.set_direction(Direction::UP);
     motor_lower.set_direction(Direction::DOWN);
+}
+
+void clean_init_state() {
+    Serial.println();
+    Serial.println("clean_init_state");
+
+    // init state variable
+    height_upper = 0;
+    height_peel = 0;
+    height_lower = 0;
+    close_cleaning = true;
+    spray_cleaning = false;
+    open_cleaning = false;
+
+    // init motor state
+    motor_upper.set_direction(Direction::DOWN);
+    motor_peel.set_direction(Direction::DOWN);
+    motor_lower.set_direction(Direction::UP);
 }

@@ -46,7 +46,7 @@ const int pressure_touch_bowl = 880;
 const int pressure_screw_rod_end_of_range = 880;
 
 // pressure too high, warning!
-const int pressure_threshold_lower = 840;
+const int pressure_threshold_lower = 600;
 
 // PID control parameters
 const float kp_default = 3, ki_default = 0.1, kd_default = 0;
@@ -57,3 +57,11 @@ const float ratio = 0.2;
 const float height_up = 10;
 // the total distance between the two clamping blades, when separated, in cm
 const float height_total = 20;
+
+// height to descend the upper clamping blade before charging the pump
+const float height_to_descend = 5;
+// height to ascend the upper clamping blade after charging the pump
+const float height_to_ascend = 5;
+
+// time to spray water, in seconds
+const float spray_time_default = 5;
