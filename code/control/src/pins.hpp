@@ -36,8 +36,8 @@ const int pin_touch_screw_rod_lower = A1;
 const int pin_touch_screw_rod_peel = A2;
 
 // pressure sensor attached to upper clamping blade
-const int pin_pressure_clamp_upper_dout = A9;
-const int pin_pressure_clamp_upper_sck = A8;
+const int pin_pressure_clamp_upper_dout = 12;
+const int pin_pressure_clamp_upper_sck = 11;
 
 // // water pump pins
 // const int pin_water_pump_1 = 13;

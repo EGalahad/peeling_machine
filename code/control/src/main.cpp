@@ -212,8 +212,8 @@ void setup() {
 void loop() {
     // output pressure sensor readings
     Serial.print("pressure: ");
-    Serial.print(pressure_sensor.get_pressure());
-    delay(1000);
+    Serial.println(pressure_sensor.get_pressure());
+    delay(100);
 }
 #else
 void setup() {
