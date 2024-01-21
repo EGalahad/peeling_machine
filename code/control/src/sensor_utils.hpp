@@ -1,7 +1,7 @@
 #pragma once
 #include "constants.hpp"
 
-class HX711;
+class HX711_ADC;
 
 class PressureSensor {
   public:
@@ -12,7 +12,7 @@ class PressureSensor {
   private:
     const int pin_pressure_sensor_sck;
     const int pin_pressure_sensor_dout;
-    HX711 *pressure_sensor;
+    HX711_ADC *pressure_sensor;
 };
 
 class TouchSensor {
